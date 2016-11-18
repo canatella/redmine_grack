@@ -7,18 +7,10 @@ module Redmine::Grack
   module Bundle
     extend self
 
-    def config
-      @config ||= YAML.load(File.read(Rails.root.join('config', 'grack.yml').to_s))
-                    .symbolize_keys.tap do |cfg|
-        cfg[:git_adapter_factory] = ->{ Grack::GitAdapter.new }
-        cfg[:root] = Pathname.new(cfg[:root])
-      end
-    end
-
     def new
       Rack::Builder.new do
         use Redmine::Grack::Auth
-        run Redmine::Grack::App.new(Bundle.config)
+        run Redmine::Grack::App.new
       end
     end
   end
@@ -42,7 +34,7 @@ module Redmine::Grack
 
 
       @repository = ::Repository.all.detect do |r|
-        r.url.end_with?("#{@repository_uri}/")
+        r.url.match(/#{@repository_uri}\/?$/)
       end
       return false if @repository.nil?
 

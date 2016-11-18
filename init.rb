@@ -5,7 +5,7 @@ Redmine::Plugin.register :redmine_grack do
   name 'Redmine Grack plugin'
   author 'Damien Merenne'
   description 'Manage access to your local git repositories over HTTP'
-  version '0.0.1'
+  version '0.0.2'
   url 'https://github.com/canatella/redmine_grack'
   author_url 'https://github.com/canatella'
 
