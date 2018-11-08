@@ -19,13 +19,17 @@ module Redmine::Grack
   end
 
   class App < ::Grack::App
+    def routes
+      @routes ||= ::Grack::App::ROUTES + [[%r{/([^/]+)}, 'GET', :redirect]]
+    end
+
     def setup_repository(request)
       # Sanitize the URI:
       # * Unescape escaped characters
       # * Replace runs of / with a single /
       path_info = Rack::Utils.unescape(request.path_info).gsub(%r{/+}, '/')
 
-      route = ::Grack::App::ROUTES.detect do |path_matcher, verb, handler|
+      route = routes.detect do |path_matcher, verb, handler|
         path_info.match(path_matcher) do |match|
           @repository_uri = match[1]
           @args = match[2..-1]
@@ -52,11 +56,14 @@ module Redmine::Grack
 
       return bad_request if bad_uri?(@repository_uri)
 
+      @project = @repository.project
+
+      return redirect if @handler == :redirect
+
       git.repository_path = @repository.url
 
       return not_found unless git.exist?
 
-      @project = @repository.project
       if @env['REMOTE_USER']
         @user = User.find_by(login: @env['REMOTE_USER'])
       end
@@ -89,6 +96,10 @@ module Redmine::Grack
           Rails.logger.info("  User is not allowed to push to #{@project.identifier}")
         end
       end
+    end
+
+    def redirect
+      [307, { 'LOCATION' => "/projects/#{@project.identifier}" }, ['Redirected']]
     end
 
     def unauthorized
