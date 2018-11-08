@@ -1,5 +1,6 @@
-require 'redmine'
-require 'redmine_grack'
+ActionDispatch::Reloader.to_prepare do
+  require_dependency 'redmine_grack'
+end
 
 Redmine::Plugin.register :redmine_grack do
   name 'Redmine Grack plugin'

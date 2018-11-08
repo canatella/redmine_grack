@@ -2,6 +2,8 @@ require 'grack/app'
 require 'rack/auth/basic'
 require 'rack/auth/abstract/handler'
 require 'rack/auth/abstract/request'
+require 'benchmark'
+require 'repository'
 
 module Redmine::Grack
   module Bundle
@@ -9,13 +11,12 @@ module Redmine::Grack
 
     def new
       Rack::Builder.new do
+        use Redmine::Grack::Logger
         use Redmine::Grack::Auth
         run Redmine::Grack::App.new
       end
     end
   end
-
-
 
   class App < ::Grack::App
     def setup_repository(request)
@@ -60,6 +61,10 @@ module Redmine::Grack
         @user = User.find_by(login: @env['REMOTE_USER'])
       end
 
+      unless @user.nil?
+        Rails.logger.info("  Current user: #{@user.login} (id=#{@user.id})")
+      end
+
       if !@project.is_public and @user.nil?
         return unauthorized
       end
@@ -68,12 +73,22 @@ module Redmine::Grack
     end
 
     def allow_pull?
-      @project.is_public? or
-        (!@user.nil? and @user.allowed_to?(:git_repository_pull, @project))
+      (@project.is_public? or
+       (!@user.nil? and
+        @user.allowed_to?(:git_repository_pull, @project))).tap do |b|
+        unless b
+          Rails.logger.info("  User is not allowed to pull from #{@project.identifier}")
+        end
+      end
     end
 
     def allow_push?
-      (!@user.nil? and @user.allowed_to?(:git_repository_push, @project))
+      (!@user.nil? and
+       @user.allowed_to?(:git_repository_push, @project)).tap do |b|
+        unless b
+          Rails.logger.info("  User is not allowed to push to #{@project.identifier}")
+        end
+      end
     end
 
     def unauthorized
@@ -112,6 +127,25 @@ module Redmine::Grack
       # we are good to go
       env['REMOTE_USER'] = @auth.username
       @app.call(env)
+    end
+  end
+
+  class Logger
+    def initialize(app)
+      @app = app
+      @logger = Rails.logger
+    end
+
+    def call(env)
+      Rails.logger.info("Processing by Redmine::Grack::App")
+      response = []
+      t = Benchmark.measure do
+        response = @app.call(env)
+      end
+      status = response.first
+      Rails.logger.
+        info("Completed #{status} #{Rack::Utils::HTTP_STATUS_CODES[status]} in #{(t.real * 1000).round}ms")
+      response
     end
   end
 end
