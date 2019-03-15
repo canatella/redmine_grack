@@ -28,5 +28,7 @@ class GrackLfs
   end
 end
 
-mount Redmine::GitLfsS3::Bundle.new, at: 'git/view-right.git/info/lfs'
+Dir.glob(['/home/repositories/git/*.git']).map { |n| File.basename(n) }.each do |n|
+  mount Redmine::GitLfsS3::Bundle.new, at: "git/#{n}/info/lfs"
+end
 mount Redmine::Grack::Bundle.new, at: 'git'
